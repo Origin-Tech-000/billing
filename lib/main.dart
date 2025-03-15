@@ -15,7 +15,7 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'dart:io' as io;
 import 'package:path/path.dart' as p;
 
-bool? result;
+ValueNotifier<bool> result = ValueNotifier(false);
 late io.Directory dir;
 late Database db;
 late DatabaseFactory df;
@@ -53,9 +53,11 @@ class _MyAppState extends State<MyApp> {
       });
       final String macId = 'ab:0a:20:24:41:12';
 
-      result = await PrintBluetoothThermal.connect(macPrinterAddress: macId);
-
-      log('connected to printer $result');
+      final connected = await PrintBluetoothThermal.connect(
+        macPrinterAddress: macId,
+      );
+      result.value = connected;
+      log('connected to printer $connected');
     } catch (e) {
       log(e.toString());
     }
@@ -63,7 +65,6 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void initState() {
-    result = false;
     connectToPrinter();
     super.initState();
   }
@@ -107,16 +108,21 @@ class pappettante_chayakadamenu extends StatelessWidget {
               style: TextStyle(color: Colors.white),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: result == true ? Colors.green : Colors.red,
-              ),
-              height: 10,
-              width: 10,
-            ),
+          ValueListenableBuilder(
+            valueListenable: result,
+            builder: (context, c, _) {
+              return Padding(
+                padding: const EdgeInsets.all(8.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: c == true ? Colors.green : Colors.red,
+                  ),
+                  height: 10,
+                  width: 10,
+                ),
+              );
+            },
           ),
           Padding(
             padding: const EdgeInsets.all(8.0),

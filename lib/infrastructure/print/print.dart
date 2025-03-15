@@ -16,9 +16,7 @@ import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 
 class PrintBilll {
-  Future<void> printBill({
-    required List<ItemModel> items,
-  }) async {
+  Future<void> printBill({required List<ItemModel> items}) async {
     try {
       Notifiers.totalBill.value = 0;
 
@@ -48,22 +46,24 @@ class PrintBilll {
     }
   }
 
-  Future<void> printBillSingle(
-      {required BillModel model,
-      required bool reprint,
-      required bool detailedPrint,
-      List<DetiledDailySaleModel>? detailedPrintList,String?date}) async {
+  Future<void> printBillSingle({
+    required BillModel model,
+    required bool reprint,
+    required bool detailedPrint,
+    List<DetiledDailySaleModel>? detailedPrintList,
+    String? date,
+  }) async {
     try {
       log('print function called');
       if (reprint == false) await Storage.insertSales(model: model);
-      log('connected to printer ${result.toString()}');
-      if (result == true) {
+      log('connected to printer ${result.value.toString()}');
+      if (result.value == true) {
         if (detailedPrint == false) {
           final byte = await generateByte(model);
           // await PrintBluetoothThermal
           // reconnectWithPrinter();
           await PrintBluetoothThermal.writeBytes(byte);
-          await Future.delayed(Duration(seconds: 15), () async {
+          await Future.delayed(Duration(seconds: 5), () async {
             // await PrintBluetoothThermal.writeBytes([]);
             printStatus.value = false;
           });
@@ -73,9 +73,12 @@ class PrintBilll {
           Notifiers.printitems.value = sfp;
           Notifiers.totalBill.value = 0;
         } else {
-          final bytes = await detailedDailyReportPrint(detailedPrintList!, date!);
+          final bytes = await detailedDailyReportPrint(
+            detailedPrintList!,
+            date!,
+          );
           await PrintBluetoothThermal.writeBytes(bytes);
-          await Future.delayed(Duration(seconds: 3), () async {
+          await Future.delayed(Duration(seconds: 5), () {
             // await PrintBluetoothThermal.writeBytes([]);
             printStatus.value = false;
           });
@@ -94,6 +97,7 @@ class PrintBilll {
 
   Future<void> reconnectWithPrinter() async {
     try {
+      result.value = false;
       await PrintBluetoothThermal.disconnect;
       print('connecting to printer');
       final List<BluetoothInfo> listResult =
@@ -106,8 +110,11 @@ class PrintBilll {
         // String mac = bluetooth.macAdress;
       });
       final String macId = 'ab:0a:20:24:41:12';
-      result = await PrintBluetoothThermal.connect(macPrinterAddress: macId);
-      log('connected to printer $result');
+      final connected = await PrintBluetoothThermal.connect(
+        macPrinterAddress: macId,
+      );
+      result.value = connected;
+      log('connected to printer $connected');
     } catch (e) {
       log(e.toString());
     }
@@ -132,50 +139,65 @@ Future<List<int>> generateByte(BillModel model) async {
   // }
 
   // Header
-  final ByteData data = await rootBundle.load('assets/logopappan.png');
-  final Uint8List byte = data.buffer.asUint8List();
-  final Image? img = decodeImage(byte);
-// final ByteData data = await rootBundle.load('assets/logo.png');
-// final Uint8List bytes = data.buffer.asUint8List();
-// final Image image = decodeImage(bytes);
-// Using `ESC *`
-  bytes += generator.image(img!);
+  // final ByteData data = await rootBundle.load('assets/logopappan.png');
+  // final Uint8List byte = data.buffer.asUint8List();
+  // final Image? img = decodeImage(byte);
+  // // final ByteData data = await rootBundle.load('assets/logo.png');
+  // // final Uint8List bytes = data.buffer.asUint8List();
+  // // final Image image = decodeImage(bytes);
+  // // Using `ESC *`
+  // bytes += generator.image(img!);
 
-// Using `GS v 0` (obsolete)
-// generator.imageRaster(img);
-// Using `GS ( L`
-// generator.imageRaster(img);
+  // Using `GS v 0` (obsolete)
+  // generator.imageRaster(img);
+  // Using `GS ( L`
+  // generator.imageRaster(img);
   // bytes += generator.text('PAPPETTANTE CHAYAKADA',
   // styles: PosStyles(bold: true, align: PosAlign.center));
-  bytes += generator.text('New Bus Stand',
-      styles: PosStyles(align: PosAlign.center));
-  bytes +=
-      generator.text('KATTAPPANA', styles: PosStyles(align: PosAlign.center));
-  bytes +=
-      generator.text('Phone : +919207390047', styles: PosStyles(align: PosAlign.center));
+  bytes += generator.text(
+    'New Bus Stand',
+    styles: PosStyles(align: PosAlign.center),
+  );
+  bytes += generator.text(
+    'KATTAPPANA',
+    styles: PosStyles(align: PosAlign.center),
+  );
+  bytes += generator.text(
+    'Phone : +919207390047',
+    styles: PosStyles(align: PosAlign.center),
+  );
   bytes += generator.feed(1);
 
   // Date & Bill Info
   final date = DateTime.now();
   bytes += generator.text(
-      'DATE: ${date.day}-${date.month}-${date.year}  TIME: ${date.hour}:${date.minute}',
-      styles: PosStyles(align: PosAlign.left));
-  bytes += generator.text('BILL NO : ${model.billId}',
-      styles: PosStyles(align: PosAlign.left));
+    'DATE: ${date.day}-${date.month}-${date.year}  TIME: ${date.hour}:${date.minute}',
+    styles: PosStyles(align: PosAlign.left),
+  );
+  bytes += generator.text(
+    'BILL NO : ${model.billId}',
+    styles: PosStyles(align: PosAlign.left),
+  );
   bytes += generator.hr(); // Divider
 
   // Title
-  bytes += generator.text('SALE BILL',
-      styles: PosStyles(bold: true, align: PosAlign.center));
+  bytes += generator.text(
+    'SALE BILL',
+    styles: PosStyles(bold: true, align: PosAlign.center),
+  );
 
   // Table Header
   bytes += generator.row([
     PosColumn(
-        text: 'SL', width: 2, styles: PosStyles(bold: true)), // Increased to 2
+      text: 'SL',
+      width: 2,
+      styles: PosStyles(bold: true),
+    ), // Increased to 2
     PosColumn(
-        text: 'Item',
-        width: 3,
-        styles: PosStyles(bold: true)), // Increased to 4
+      text: 'Item',
+      width: 3,
+      styles: PosStyles(bold: true),
+    ), // Increased to 4
     PosColumn(text: 'Qty', width: 2, styles: PosStyles(bold: true)),
     PosColumn(text: 'Rate', width: 2, styles: PosStyles(bold: true)),
     PosColumn(text: 'Price', width: 3, styles: PosStyles(bold: true)),
@@ -188,29 +210,39 @@ Future<List<int>> generateByte(BillModel model) async {
       PosColumn(text: item.orderQuantity.toString(), width: 2),
       PosColumn(text: item.itemPrice, width: 2),
       PosColumn(
-          text: (int.parse(item.orderQuantity!) * int.parse(item.itemPrice))
-              .toString(),
-          width: 3),
+        text:
+            (int.parse(item.orderQuantity!) * int.parse(item.itemPrice))
+                .toString(),
+        width: 3,
+      ),
     ]);
   }
   bytes += generator.hr(); // Divider
 
   // Total Amount
-  bytes += generator.text('Total Amount : ${model.billPrice}',
-      styles: PosStyles(bold: true, align: PosAlign.right));
+  bytes += generator.text(
+    'Total Amount : ${model.billPrice}',
+    styles: PosStyles(bold: true, align: PosAlign.right),
+  );
   // bytes += generator.text('Additional Charges : ${model.additional}',
   //     styles: PosStyles(bold: true, align: PosAlign.right));
-  bytes += generator.text('Final Amount : ${int.parse(model.billPrice)}',
-      styles: PosStyles(bold: true, align: PosAlign.right));
+  bytes += generator.text(
+    'Final Amount : ${int.parse(model.billPrice)}',
+    styles: PosStyles(bold: true, align: PosAlign.right),
+  );
 
   bytes += generator.hr(); // Divider
 
   // Footer Message
-  bytes += generator.text('CAUTION: CONSUME PACKED FOOD WITHIN 2 HOURS',
-      styles: PosStyles(align: PosAlign.center));
+  bytes += generator.text(
+    'CAUTION: CONSUME PACKED FOOD WITHIN 2 HOURS',
+    styles: PosStyles(align: PosAlign.center),
+  );
   bytes += generator.feed(1);
-  bytes += generator.text('THANK YOU VISIT AGAIN',
-      styles: PosStyles(bold: true, align: PosAlign.center));
+  bytes += generator.text(
+    'THANK YOU VISIT AGAIN',
+    styles: PosStyles(bold: true, align: PosAlign.center),
+  );
 
   // QR Code
   // bytes += generator.text('example.com');
@@ -220,7 +252,9 @@ Future<List<int>> generateByte(BillModel model) async {
 }
 
 Future<List<int>> detailedDailyReportPrint(
-    List<DetiledDailySaleModel> model , String date) async {
+  List<DetiledDailySaleModel> model,
+  String date,
+) async {
   List<int> bytes = [];
 
   // Load ESC/POS profile
@@ -238,65 +272,76 @@ Future<List<int>> detailedDailyReportPrint(
   // }
 
   // Header
-  final ByteData data = await rootBundle.load('assets/logopappan.png');
-  final Uint8List byte = data.buffer.asUint8List();
-  final Image? img = decodeImage(byte);
-// final ByteData data = await rootBundle.load('assets/logo.png');
-// final Uint8List bytes = data.buffer.asUint8List();
-// final Image image = decodeImage(bytes);
-// Using `ESC *`
-  bytes += generator.image(img!);
+  // final ByteData data = await rootBundle.load('assets/logopappan.png');
+  // final Uint8List byte = data.buffer.asUint8List();
+  // final Image? img = decodeImage(byte);
+  // // final ByteData data = await rootBundle.load('assets/logo.png');
+  // // final Uint8List bytes = data.buffer.asUint8List();
+  // // final Image image = decodeImage(bytes);
+  // // Using `ESC *`
+  // bytes += generator.image(img!);
 
-// Using `GS v 0` (obsolete)
-// generator.imageRaster(img);
-// Using `GS ( L`
-// generator.imageRaster(img);
+  // Using `GS v 0` (obsolete)
+  // generator.imageRaster(img);
+  // Using `GS ( L`
+  // generator.imageRaster(img);
   // bytes += generator.text('PAPPETTANTE CHAYAKADA',
   // styles: PosStyles(bold: true, align: PosAlign.center));
-  bytes += generator.text('New Bus Stand',
-      styles: PosStyles(align: PosAlign.center));
-  bytes +=
-      generator.text('KATTAPPANA', styles: PosStyles(align: PosAlign.center));
-  
+  bytes += generator.text(
+    'New Bus Stand',
+    styles: PosStyles(align: PosAlign.center),
+  );
+  bytes += generator.text(
+    'KATTAPPANA',
+    styles: PosStyles(align: PosAlign.center),
+  );
+
   bytes += generator.feed(1);
 
   // Date & Bill Info
   // final date = DateTime.now();
 
   bytes += generator.text(
-      "DATE : $date",
-      styles: PosStyles(align: PosAlign.left));
+    "DATE : $date",
+    styles: PosStyles(align: PosAlign.left),
+  );
   // bytes += generator.text('BILL NO : ${model.billId}',
   // styles: PosStyles(align: PosAlign.left));
   bytes += generator.hr(); // Divider
 
   // Title
-  bytes += generator.text('ITEM DETAILED BILL',
-      styles: PosStyles(bold: true, align: PosAlign.center));
+  bytes += generator.text(
+    'ITEM DETAILED BILL',
+    styles: PosStyles(bold: true, align: PosAlign.center),
+  );
   bytes += generator.hr(); // Divider
-
 
   // Table Header
   bytes += generator.row([
     // PosColumn(
     //     text: 'SL', width: 2, styles: PosStyles(bold: true)), // Increased to 2
     PosColumn(
-        text: 'Item',
-        width: 3,
-        styles: PosStyles(bold: true)), // Increased to 4
+      text: 'Item',
+      width: 3,
+      styles: PosStyles(bold: true),
+    ), // Increased to 4
     PosColumn(text: 'PRICE', width: 3, styles: PosStyles(bold: true)),
     PosColumn(text: 'QTY', width: 3, styles: PosStyles(bold: true)),
     PosColumn(text: 'TOTAL', width: 3, styles: PosStyles(bold: true)),
   ]);
   bytes += generator.hr(); // Divider
 
-
   for (var item in model) {
     bytes += generator.row([
       PosColumn(text: item.item, width: 3), // Matches header width
       PosColumn(text: item.itemPrice, width: 3),
       PosColumn(text: item.itemQuantity, width: 3),
-      PosColumn(text: (int.parse(item.itemPrice)*int.parse(item.itemQuantity)).toString(), width: 3),
+      PosColumn(
+        text:
+            (int.parse(item.itemPrice) * int.parse(item.itemQuantity))
+                .toString(),
+        width: 3,
+      ),
       // PosColumn(text: item.itemPrice, width: 2),
       // PosColumn(
       //     text: (int.parse(item.orderQuantity!) * int.parse(item.itemPrice))
@@ -308,23 +353,24 @@ Future<List<int>> detailedDailyReportPrint(
   int total = 0;
 
   for (var element in model) {
-    int data = int.parse(element.itemQuantity)*int.parse(element.itemPrice);
-    total+= data;
+    int data = int.parse(element.itemQuantity) * int.parse(element.itemPrice);
+    total += data;
   }
 
-  bytes += generator.text('TOTAL SALE :$total',
-      styles: PosStyles(bold: true, align: PosAlign.right));
+  bytes += generator.text(
+    'TOTAL SALE :$total',
+    styles: PosStyles(bold: true, align: PosAlign.right),
+  );
 
-//  bytes+= PosColumn(text: ('TOTAL AMOUNT = $total'), width: 12);
-
+  //  bytes+= PosColumn(text: ('TOTAL AMOUNT = $total'), width: 12);
 
   // Total Amount
   // bytes += generator.text('Total Amount : ${model.billPrice}',
-      // styles: PosStyles(bold: true, align: PosAlign.right));
+  // styles: PosStyles(bold: true, align: PosAlign.right));
   // bytes += generator.text('Additional Charges : ${model.additional}',
   //     styles: PosStyles(bold: true, align: PosAlign.right));
   // bytes += generator.text('Final Amount : ${int.parse(model.billPrice)}',
-      // styles: PosStyles(bold: true, align: PosAlign.right));
+  // styles: PosStyles(bold: true, align: PosAlign.right));
 
   bytes += generator.hr(); // Divider
 
